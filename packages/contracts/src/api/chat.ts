@@ -52,7 +52,8 @@ export type ByokChatProtocol =
   | 'google'
   | 'ollama'
   | 'senseaudio'
-  | 'aihubmix';
+  | 'aihubmix'
+  | 'aimlapi';
 
 export interface ByokChatProviderConfig {
   protocol: ByokChatProtocol;

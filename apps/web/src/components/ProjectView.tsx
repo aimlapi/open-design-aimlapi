@@ -1705,7 +1705,8 @@ function isOpenCodeByokChatProtocol(
     protocol === 'google' ||
     protocol === 'ollama' ||
     protocol === 'senseaudio' ||
-    protocol === 'aihubmix'
+    protocol === 'aihubmix' ||
+    protocol === 'aimlapi'
   );
 }
 
