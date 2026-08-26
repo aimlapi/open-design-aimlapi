@@ -268,6 +268,27 @@ describe('byok-opencode runtime config', () => {
     });
   });
 
+  // This runtime serves real BYOK chat; the /api/proxy/* routes do not. If the
+  // pair is missing here it is missing from every actual inference request,
+  // while Test connection and model discovery still look correctly attributed
+  // — which is exactly the shape of failure that hides.
+  it('sends the aimlapi.com attribution pair on real chat traffic', () => {
+    const out = buildOpenCodeByokProviderConfig(
+      {
+        protocol: 'aimlapi',
+        apiKey: 'sk-aimlapi-secret',
+        baseUrl: 'https://api.aimlapi.com/v1',
+      },
+      'openai/gpt-5.6-terra',
+    );
+
+    const options = (out?.config as any).provider[BYOK_OPENCODE_PROVIDER_ID].options;
+    expect(options.headers['X-AIMLAPI-Source']).toBe('agent/open-design');
+    expect(options.headers['X-AIMLAPI-Partner-ID']).toBe(
+      'part_9TWZWFsyMyNrBDEENq5JaU0r',
+    );
+  });
+
   it('maps other native BYOK protocols to provider packages', () => {
     expect(buildOpenCodeByokProviderConfig(
       { protocol: 'anthropic', apiKey: 'sk-ant', baseUrl: 'https://api.anthropic.com' },
