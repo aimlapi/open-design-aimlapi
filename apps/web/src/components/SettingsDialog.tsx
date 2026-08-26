@@ -816,10 +816,6 @@ function byokDraftBaseUrlHost(value: string): string | undefined {
 }
 
 const API_KEY_CONSOLE_LINKS: Record<ApiProtocol, { host: string; url: string }> = {
-  aimlapi: {
-    host: 'aimlapi.com',
-    url: 'https://aimlapi.com/app/keys',
-  },
   anthropic: {
     host: 'console.anthropic.com',
     url: 'https://console.anthropic.com/settings/keys',
@@ -847,6 +843,10 @@ const API_KEY_CONSOLE_LINKS: Record<ApiProtocol, { host: string; url: string }> 
   aihubmix: {
     host: 'aihubmix.com',
     url: 'https://aihubmix.com/?aff=JA1e',
+  },
+  aimlapi: {
+    host: 'aimlapi.com',
+    url: 'https://aimlapi.com/app/keys',
   },
   bedrock: {
     host: 'aws.amazon.com',

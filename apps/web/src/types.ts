@@ -112,7 +112,6 @@ export type {
 
 export type ExecMode = 'daemon' | 'api';
 export type ApiProtocol =
-  | 'aimlapi'
   | 'anthropic'
   | 'openai'
   | 'azure'
@@ -120,6 +119,7 @@ export type ApiProtocol =
   | 'ollama'
   | 'senseaudio'
   | 'aihubmix'
+  | 'aimlapi'
   | 'bedrock';
 
 export type LiveArtifactTabId = `live:${string}`;

@@ -249,7 +249,6 @@ export interface ConnectionTestDiagnostics {
 }
 
 export type ConnectionTestProtocol =
-  | 'aimlapi'
   | 'anthropic'
   | 'openai'
   | 'azure'
@@ -257,6 +256,7 @@ export type ConnectionTestProtocol =
   | 'ollama'
   | 'senseaudio'
   | 'aihubmix'
+  | 'aimlapi'
   | 'bedrock';
 
 export interface ProviderTestRequest extends ReasoningExecutionRequestFields {

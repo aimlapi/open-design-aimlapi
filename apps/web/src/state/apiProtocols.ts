@@ -20,17 +20,6 @@ import type { ApiProtocol } from '../types';
 // completions endpoint speaks the same JSON shape; the deployment name
 // the user types in the model field is what's variable, not the API.
 export const SUGGESTED_MODELS_BY_PROTOCOL: Record<ApiProtocol, readonly string[]> = {
-  // aimlapi.com fronts ~900 models behind one key; these are the flagships the
-  // catalog marks hottest, which is what the dropdown should open on.
-  aimlapi: [
-    'openai/gpt-5.6-terra',
-    'anthropic/claude-sonnet-5',
-    'anthropic/claude-opus-5',
-    'google/gemini-3.6-flash',
-    'deepseek/deepseek-v4-pro',
-    'x-ai/grok-4-5',
-    'moonshot/kimi-k3',
-  ],
   anthropic: [
     'claude-opus-4-5',
     'claude-sonnet-4-5',
@@ -113,6 +102,17 @@ export const SUGGESTED_MODELS_BY_PROTOCOL: Record<ApiProtocol, readonly string[]
     'deepseek-chat',
     'deepseek-reasoner',
   ],
+  // aimlapi.com fronts ~900 models behind one key; these are the flagships the
+  // catalog marks hottest, which is what the dropdown should open on.
+  aimlapi: [
+    'openai/gpt-5.6-terra',
+    'anthropic/claude-sonnet-5',
+    'anthropic/claude-opus-5',
+    'google/gemini-3.6-flash',
+    'deepseek/deepseek-v4-pro',
+    'x-ai/grok-4-5',
+    'moonshot/kimi-k3',
+  ],
   bedrock: [
     'anthropic.claude-3-5-sonnet-20241022-v2:0',
     'anthropic.claude-3-5-haiku-20241022-v1:0',
@@ -173,7 +173,6 @@ export const SUGGESTED_MODELS_BY_PROTOCOL: Record<ApiProtocol, readonly string[]
 // your OpenAI key") and by anyone else who needs a one-pick default
 // that prioritises latency + cost over reasoning depth.
 export const FAST_MODEL_BY_PROTOCOL: Record<ApiProtocol, string> = {
-  aimlapi: 'google/gemini-3.6-flash',
   anthropic: 'claude-haiku-4-5',
   openai: 'gpt-4o-mini',
   azure: 'gpt-4o-mini',
@@ -186,6 +185,7 @@ export const FAST_MODEL_BY_PROTOCOL: Record<ApiProtocol, string> = {
   ollama: 'gemma3:4b',
   senseaudio: 'senseaudio-s2-flash',
   aihubmix: 'gpt-4o-mini',
+  aimlapi: 'google/gemini-3.6-flash',
   bedrock: 'amazon.nova-lite-v1:0',
 };
 
@@ -193,7 +193,6 @@ export const API_PROTOCOL_TABS: ReadonlyArray<{
   id: ApiProtocol;
   title: string;
 }> = [
-  { id: 'aimlapi', title: 'aimlapi.com' },
   { id: 'anthropic', title: 'Anthropic' },
   { id: 'openai', title: 'OpenAI' },
   { id: 'azure', title: 'Azure OpenAI' },
@@ -201,10 +200,10 @@ export const API_PROTOCOL_TABS: ReadonlyArray<{
   { id: 'ollama', title: 'Ollama Cloud' },
   { id: 'senseaudio', title: 'SenseAudio' },
   { id: 'aihubmix', title: 'AIHubMix' },
+  { id: 'aimlapi', title: 'aimlapi.com' },
 ];
 
 export const API_PROTOCOL_LABELS: Record<ApiProtocol, string> = {
-  aimlapi: 'aimlapi.com',
   anthropic: 'Anthropic API',
   openai: 'OpenAI API',
   azure: 'Azure OpenAI',
@@ -212,11 +211,11 @@ export const API_PROTOCOL_LABELS: Record<ApiProtocol, string> = {
   ollama: 'Ollama Cloud API',
   senseaudio: 'SenseAudio API',
   aihubmix: 'AIHubMix API',
+  aimlapi: 'aimlapi.com',
   bedrock: 'AWS Bedrock',
 };
 
 export const API_KEY_PLACEHOLDERS: Record<ApiProtocol, string> = {
-  aimlapi: 'aimlapi.com API key',
   anthropic: 'sk-ant-...',
   openai: 'sk-...',
   azure: 'azure key',
@@ -224,6 +223,7 @@ export const API_KEY_PLACEHOLDERS: Record<ApiProtocol, string> = {
   ollama: 'Ollama API key',
   senseaudio: 'SenseAudio API key',
   aihubmix: 'sk-...',
+  aimlapi: 'aimlapi.com API key',
   bedrock: 'AWS credentials',
 };
 
