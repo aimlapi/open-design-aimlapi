@@ -96,12 +96,20 @@ function isMemoryType(value: unknown): value is MemoryType {
 }
 
 function isExtractionProvider(value: unknown): value is MemoryExtractionProvider {
+  // Must stay exhaustive over MemoryExtractionProvider: a protocol the type
+  // admits but this guard omits is rejected here as an 'invalid extraction
+  // provider', so the user cannot save an override for a vendor the extractor
+  // itself supports. `senseaudio`, `aihubmix` and `aimlapi` all reach the
+  // extractor through the OpenAI-compatible path in memory-llm.ts.
   return (
     value === 'anthropic'
     || value === 'openai'
     || value === 'azure'
     || value === 'google'
     || value === 'ollama'
+    || value === 'senseaudio'
+    || value === 'aihubmix'
+    || value === 'aimlapi'
   );
 }
 

@@ -143,8 +143,9 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
   {
     label: 'aimlapi.com',
     // Native protocol (see state/apiProtocols.ts), not a KNOWN_PROVIDERS-only
-    // OpenAI-compatible preset — the 'aimlapi' tab already has its own request
-    // handling in providers/aimlapi-compatible.ts. This entry only exists so
+    // OpenAI-compatible preset. BYOK chat is served by the OpenCode runtime
+    // (apps/daemon/src/runtimes/byok-opencode.ts), which is where the
+    // attribution pair is attached; this entry only exists so
     // defaultApiProtocolConfig()/switchApiProtocolConfig() (below) can resolve
     // a baseUrl for that protocol; it must not be 'openai' or it collides with
     // the plain OpenAI preset's default.
