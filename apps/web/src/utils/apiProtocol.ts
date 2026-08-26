@@ -2,6 +2,7 @@ import { isOpenAICompatible } from '../providers/openai-compatible';
 import type { ApiProtocol, AppConfig } from '../types';
 
 const API_PROTOCOL_LABELS: Record<ApiProtocol, string> = {
+  aimlapi: 'aimlapi.com',
   anthropic: 'Anthropic API',
   openai: 'OpenAI API',
   azure: 'Azure OpenAI',
@@ -13,6 +14,7 @@ const API_PROTOCOL_LABELS: Record<ApiProtocol, string> = {
 };
 
 const API_PROTOCOL_AGENT_IDS: Record<ApiProtocol, string> = {
+  aimlapi: 'aimlapi-api',
   anthropic: 'anthropic-api',
   openai: 'openai-api',
   azure: 'azure-openai-api',
