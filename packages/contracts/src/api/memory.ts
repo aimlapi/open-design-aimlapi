@@ -140,6 +140,7 @@ export interface MemoryListResponse {
  *  ollama and senseaudio through the same callOpenAI path since the
  *  wire protocol is identical. */
 export type MemoryExtractionProvider =
+  | 'aimlapi'
   | 'anthropic'
   | 'openai'
   | 'azure'

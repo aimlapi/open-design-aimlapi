@@ -249,6 +249,7 @@ export interface ConnectionTestDiagnostics {
 }
 
 export type ConnectionTestProtocol =
+  | 'aimlapi'
   | 'anthropic'
   | 'openai'
   | 'azure'

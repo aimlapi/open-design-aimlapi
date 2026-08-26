@@ -816,6 +816,10 @@ function byokDraftBaseUrlHost(value: string): string | undefined {
 }
 
 const API_KEY_CONSOLE_LINKS: Record<ApiProtocol, { host: string; url: string }> = {
+  aimlapi: {
+    host: 'aimlapi.com',
+    url: 'https://aimlapi.com/app/keys',
+  },
   anthropic: {
     host: 'console.anthropic.com',
     url: 'https://console.anthropic.com/settings/keys',

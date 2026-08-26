@@ -112,6 +112,7 @@ export type {
 
 export type ExecMode = 'daemon' | 'api';
 export type ApiProtocol =
+  | 'aimlapi'
   | 'anthropic'
   | 'openai'
   | 'azure'

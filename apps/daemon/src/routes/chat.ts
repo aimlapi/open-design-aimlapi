@@ -31,6 +31,7 @@ import {
   aihubmixOriginFromBase,
   classifyAIHubMixModel,
 } from '../integrations/aihubmix.js';
+import { aimlapiHeaders, AIMLAPI_DEFAULT_BASE_URL } from '../integrations/aimlapi.js';
 import { isSafeId as isSafeProjectId } from '../projects.js';
 import { projectKindToTracking } from '@open-design/contracts/analytics';
 import { proxyDispatcherRequestInit, validateUserProviderBaseUrl } from '../connectionTest.js';
@@ -208,13 +209,13 @@ export function registerChatRoutes(app: Express, ctx: RegisterChatRoutesDeps) {
     const protocol = body.protocol;
     if (
       typeof protocol !== 'string' ||
-      !['anthropic', 'openai', 'azure', 'google', 'ollama', 'senseaudio', 'aihubmix', 'bedrock'].includes(protocol)
+      !['aimlapi', 'anthropic', 'openai', 'azure', 'google', 'ollama', 'senseaudio', 'aihubmix', 'bedrock'].includes(protocol)
     ) {
       return sendApiError(
         res,
         400,
         'BAD_REQUEST',
-        'protocol must be one of anthropic|openai|azure|google|ollama|senseaudio|aihubmix|bedrock',
+        'protocol must be one of aimlapi|anthropic|openai|azure|google|ollama|senseaudio|aihubmix|bedrock',
       );
     }
     // AIHubMix's catalogue (GET /api/v1/models?type=llm) is public, so its
@@ -286,13 +287,13 @@ export function registerChatRoutes(app: Express, ctx: RegisterChatRoutesDeps) {
         const protocol = body.protocol;
         if (
           typeof protocol !== 'string' ||
-          !['anthropic', 'openai', 'azure', 'google', 'ollama', 'senseaudio', 'aihubmix', 'bedrock'].includes(protocol)
+          !['aimlapi', 'anthropic', 'openai', 'azure', 'google', 'ollama', 'senseaudio', 'aihubmix', 'bedrock'].includes(protocol)
         ) {
           return sendApiError(
             res,
             400,
             'BAD_REQUEST',
-            'protocol must be one of anthropic|openai|azure|google|ollama|senseaudio|aihubmix|bedrock',
+            'protocol must be one of aimlapi|anthropic|openai|azure|google|ollama|senseaudio|aihubmix|bedrock',
           );
         }
         const apiKeyRequired = protocol !== 'bedrock';
@@ -1172,6 +1173,165 @@ export function registerChatRoutes(app: Express, ctx: RegisterChatRoutesDeps) {
       sse.end();
     } catch (err: any) {
       console.error(`[proxy:openai] internal error: ${err.message}`);
+      sendProxyError(sse, err.message, { code: 'INTERNAL_ERROR' });
+      sse.end();
+    } finally {
+      await proxyDispatcher?.close();
+    }
+  });
+
+  // aimlapi.com: OpenAI-wire-compatible aggregator (~900 models behind one
+  // key). Wire-identical to the generic OpenAI route, so this is that route
+  // with one difference — every request carries the aimlapi.com attribution
+  // pair via aimlapiHeaders(). A dedicated route rather than a hostname branch
+  // in the OpenAI one keeps "picker tab -> daemon log line -> upstream call"
+  // readable end to end, the same reasoning the AIHubMix client documents.
+  app.post('/api/proxy/aimlapi/stream', async (req, res) => {
+    /** @type {Partial<ProxyStreamRequest>} */
+    const proxyBody = req.body || {};
+    if (rejectProxyPluginContext(proxyBody, res)) return;
+    const { baseUrl, apiKey, model, systemPrompt, messages, maxTokens } =
+      proxyBody;
+    if (!baseUrl || !apiKey || !model) {
+      return sendApiError(
+        res,
+        400,
+        'BAD_REQUEST',
+        'baseUrl, apiKey, and model are required',
+      );
+    }
+
+    const validated = await validateExternalApiBaseUrl(baseUrl);
+    if (validated.error) {
+      return sendApiError(
+        res,
+        validated.forbidden ? 403 : 400,
+        validated.forbidden ? 'FORBIDDEN' : 'BAD_REQUEST',
+        validated.error,
+      );
+    }
+    const reasoningDenial = authorizeReasoningEgress({
+      policy: proxyBody.reasoningExecution,
+      routeKind: 'proxy',
+      provider: 'aimlapi',
+      resolvedBaseUrl: baseUrl,
+      model,
+    });
+    if (reasoningDenial) return sendReasoningEgressDenial(res, reasoningDenial);
+
+    const url = appendVersionedApiPath(baseUrl, '/chat/completions');
+    console.log(
+      `[proxy:aimlapi] ${req.method} ${validated.parsed!.hostname} model=${model}`,
+    );
+
+    const payloadMessages = Array.isArray(messages) ? [...messages] : [];
+    if (typeof systemPrompt === 'string' && systemPrompt) {
+      payloadMessages.unshift({ role: 'system', content: systemPrompt });
+    }
+
+    const effectiveMaxTokens =
+      typeof maxTokens === 'number' && maxTokens > 0 ? maxTokens : 8192;
+    const payload: any = {
+      model,
+      messages: payloadMessages,
+      ...buildOpenAIChatTokenParam(model, effectiveMaxTokens),
+      stream: true,
+    };
+    const retryPayload = {
+      model,
+      messages: payloadMessages,
+      ...buildMaxCompletionTokensParam(effectiveMaxTokens),
+      stream: true,
+    };
+    const canRetryUnsupportedMaxTokens = isAzureOpenAIHostname(
+      validated.parsed!.hostname,
+    );
+
+    const sse = createSseResponse(res);
+    let proxyDispatcher: ReturnType<typeof proxyDispatcherRequestInit> | null = null;
+    try {
+      proxyDispatcher = proxyDispatcherRequestInit();
+      const signal = clientDisconnectSignal(res);
+      sse.send('start', { model });
+      const requestInit = {
+        ...proxyDispatcher.requestInit,
+        signal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // aimlapiHeaders carries Bearer auth AND the attribution pair
+          // aimlapi.com expects on every request. Building the header set in
+          // one helper is what keeps that true when this route changes.
+          ...aimlapiHeaders(apiKey),
+          'HTTP-Referer': 'https://opendesign.dev',
+          'X-Title': 'OpenDesign',
+        },
+        redirect: 'error' as const,
+      };
+      let response = await fetch(url, {
+        ...requestInit,
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorText = await response.text();
+        if (
+          canRetryUnsupportedMaxTokens &&
+          response.status === 400 &&
+          isUnsupportedMaxTokensError(errorText)
+        ) {
+          console.warn(
+            `[proxy:aimlapi] retrying Azure-hosted request with max_completion_tokens model=${model}`,
+          );
+          response = await fetch(url, {
+            ...requestInit,
+            body: JSON.stringify(retryPayload),
+          });
+          errorText = response.ok ? '' : await response.text();
+        }
+        if (!response.ok) {
+          console.error(
+            `[proxy:aimlapi] upstream error: ${response.status} ${redactAuthTokens(errorText)}`,
+          );
+          sendProxyError(sse, `Upstream error: ${response.status}`, {
+            code: proxyErrorCode(response.status),
+            details: errorText,
+            retryable: response.status === 429 || response.status >= 500,
+          });
+          return sse.end();
+        }
+      }
+
+      let ended = false;
+      const guard = createDeltaGuard(sse);
+      await streamUpstreamSse(response, ({ payload, data }: any) => {
+        if (payload === '[DONE]') {
+          sse.send('end', {});
+          ended = true;
+          return true;
+        }
+        if (!data) return false;
+        const streamError = extractStreamErrorMessage(data);
+        if (streamError) {
+          sendProxyError(sse, `Provider error: ${streamError}`, { details: data });
+          ended = true;
+          return true;
+        }
+        const delta = extractOpenAIText(data);
+        if (delta) { 
+          guard.sendDelta(delta); 
+          if (guard.contaminated) { 
+            sse.send('end', {}); 
+            ended = true; 
+            return true; 
+          } 
+        }
+        return false;
+      });
+      if (!ended) sse.send('end', {});
+      sse.end();
+    } catch (err: any) {
+      console.error(`[proxy:aimlapi] internal error: ${err.message}`);
       sendProxyError(sse, err.message, { code: 'INTERNAL_ERROR' });
       sse.end();
     } finally {
