@@ -223,6 +223,7 @@ export const DEFAULT_BASE_URL_BY_PROTOCOL: Record<ApiProtocol, string> = {
   ollama: 'https://ollama.com',
   senseaudio: 'https://api.senseaudio.cn',
   aihubmix: 'https://aihubmix.com/v1',
+  aimlapi: 'https://api.aimlapi.com/v1',
   bedrock: 'https://bedrock-runtime.us-east-1.amazonaws.com',
 };
 

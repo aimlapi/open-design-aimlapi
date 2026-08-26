@@ -60,6 +60,7 @@ import {
   isUnsupportedMaxTokensError,
 } from './integrations/openai-chat-token-params.js';
 import { aihubmixHeaders } from './integrations/aihubmix.js';
+import { aimlapiHeaders } from './integrations/aimlapi.js';
 import type { AgentCliEnvPrefs } from './app-config.js';
 import type { RuntimeAgentDef } from './runtimes/types.js';
 import { preparePromptFileForAgent, type PreparedPromptFile } from './runtimes/prompt-file.js';
@@ -945,7 +946,13 @@ function inspectProviderCompletion(
   const obj = data && typeof data === 'object' ? data as Record<string, unknown> : null;
   if (!obj) return { valid: false };
 
-  if (protocol === 'openai' || protocol === 'azure' || protocol === 'senseaudio' || protocol === 'aihubmix') {
+  if (
+    protocol === 'openai' ||
+    protocol === 'azure' ||
+    protocol === 'senseaudio' ||
+    protocol === 'aihubmix' ||
+    protocol === 'aimlapi'
+  ) {
     const responseModel = typeof obj.model === 'string' ? obj.model : '';
     if (
       // AIHubMix is omitted from the strict response-model check (like Azure):
@@ -1420,6 +1427,24 @@ function buildProviderCall(input: ProviderTestRequest): ProviderCallShape {
           }
           return '';
         },
+      };
+    case 'aimlapi':
+      // aimlapi.com is wire-compatible with OpenAI but carries the attribution
+      // pair on every request (see aimlapiHeaders) — the smoke test included,
+      // so a key check is attributed like any other call.
+      return {
+        url: appendVersionedApiPath(baseUrl, '/chat/completions'),
+        headers: {
+          'content-type': 'application/json',
+          ...aimlapiHeaders(apiKey),
+        },
+        body: {
+          model,
+          ...buildOpenAIChatTokenParam(model, PROVIDER_MAX_TOKENS),
+          messages: [{ role: 'user', content: SMOKE_PROMPT }],
+          stream: false,
+        },
+        extractText: extractOpenAIMessageText,
       };
     case 'aihubmix':
       // AIHubMix is wire-compatible with OpenAI but carries the fixed APP-Code
