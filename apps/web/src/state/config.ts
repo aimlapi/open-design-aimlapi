@@ -141,6 +141,32 @@ export interface KnownProvider {
 // selection. They are not a replacement for provider model discovery.
 export const KNOWN_PROVIDERS: KnownProvider[] = [
   {
+    label: 'aimlapi.com',
+    // Native protocol (see state/apiProtocols.ts), not a KNOWN_PROVIDERS-only
+    // OpenAI-compatible preset — the 'aimlapi' tab already has its own request
+    // handling in providers/aimlapi-compatible.ts. This entry only exists so
+    // defaultApiProtocolConfig()/switchApiProtocolConfig() (below) can resolve
+    // a baseUrl for that protocol; it must not be 'openai' or it collides with
+    // the plain OpenAI preset's default.
+    protocol: 'aimlapi',
+    baseUrl: 'https://api.aimlapi.com/v1',
+    // Mirrors SUGGESTED_MODELS_BY_PROTOCOL.aimlapi in state/apiProtocols.ts —
+    // keep the two in sync rather than curating a second list here.
+    preferredModels: [
+      'openai/gpt-5.6-terra',
+      'anthropic/claude-sonnet-5',
+      'anthropic/claude-opus-5',
+      'google/gemini-3.6-flash',
+      'deepseek/deepseek-v4-pro',
+      'x-ai/grok-4-5',
+      'moonshot/kimi-k3',
+    ],
+    apiKeyConsoleLink: {
+      host: 'aimlapi.com',
+      url: 'https://aimlapi.com/app/keys?utm_source=open_design&utm_medium=provider_preset&utm_campaign=aimlapi_byok',
+    },
+  },
+  {
     label: 'Anthropic (Claude)',
     protocol: 'anthropic',
     baseUrl: 'https://api.anthropic.com',
