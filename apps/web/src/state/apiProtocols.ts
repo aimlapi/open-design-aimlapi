@@ -23,7 +23,7 @@ export const SUGGESTED_MODELS_BY_PROTOCOL: Record<ApiProtocol, readonly string[]
   // aimlapi.com fronts ~900 models behind one key; these are the flagships the
   // catalog marks hottest, which is what the dropdown should open on.
   aimlapi: [
-    'openai/gpt-5.6-terra-pro',
+    'openai/gpt-5.6-terra',
     'anthropic/claude-sonnet-5',
     'anthropic/claude-opus-5',
     'google/gemini-3.6-flash',
