@@ -243,6 +243,31 @@ describe('byok-opencode runtime config', () => {
     },
   );
 
+  it('builds OpenAI-compatible provider config for aimlapi.com', () => {
+    const out = buildOpenCodeByokProviderConfig(
+      {
+        protocol: 'aimlapi',
+        apiKey: 'sk-aimlapi-secret',
+        baseUrl: 'https://api.aimlapi.com/v1',
+      },
+      'openai/gpt-5.6-terra',
+    );
+
+    expect(out?.modelId).toBe('open-design-byok/openai/gpt-5.6-terra');
+    expect(out?.env).toEqual({ [BYOK_OPENCODE_API_KEY_ENV]: 'sk-aimlapi-secret' });
+    expect(out?.config).toMatchObject({
+      provider: {
+        [BYOK_OPENCODE_PROVIDER_ID]: {
+          npm: '@ai-sdk/openai-compatible',
+          options: {
+            baseURL: 'https://api.aimlapi.com/v1',
+            apiKey: `{env:${BYOK_OPENCODE_API_KEY_ENV}}`,
+          },
+        },
+      },
+    });
+  });
+
   it('maps other native BYOK protocols to provider packages', () => {
     expect(buildOpenCodeByokProviderConfig(
       { protocol: 'anthropic', apiKey: 'sk-ant', baseUrl: 'https://api.anthropic.com' },

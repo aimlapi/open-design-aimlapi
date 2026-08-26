@@ -529,6 +529,7 @@ export interface ByokProviderPresetConfig {
 }
 
 const BYOK_PROVIDER_PRESET_SPECS = [
+  { id: 'aimlapi', title: 'aimlapi.com', providerLabel: 'aimlapi.com' },
   { id: 'anthropic', title: 'Anthropic', providerLabel: 'Anthropic (Claude)' },
   { id: 'openai', title: 'OpenAI', providerLabel: 'OpenAI' },
   { id: 'atlascloud', title: 'Atlas Cloud', providerLabel: 'Atlas Cloud' },

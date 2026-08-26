@@ -16,6 +16,7 @@ const DEFAULT_BASE_URL_BY_PROTOCOL: Record<ByokChatProviderConfig['protocol'], s
   ollama: 'https://ollama.com',
   senseaudio: 'https://api.senseaudio.cn',
   aihubmix: 'https://aihubmix.com/v1',
+  aimlapi: 'https://api.aimlapi.com/v1',
 };
 
 type ProviderPackage =
@@ -239,6 +240,7 @@ function buildProviderEntry(
       };
     case 'senseaudio':
     case 'aihubmix':
+    case 'aimlapi':
       return {
         npm: '@ai-sdk/openai-compatible',
         options: {
