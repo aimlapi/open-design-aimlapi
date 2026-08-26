@@ -193,6 +193,7 @@ export const API_PROTOCOL_TABS: ReadonlyArray<{
   id: ApiProtocol;
   title: string;
 }> = [
+  { id: 'aimlapi', title: 'aimlapi.com' },
   { id: 'anthropic', title: 'Anthropic' },
   { id: 'openai', title: 'OpenAI' },
   { id: 'azure', title: 'Azure OpenAI' },
@@ -200,7 +201,6 @@ export const API_PROTOCOL_TABS: ReadonlyArray<{
   { id: 'ollama', title: 'Ollama Cloud' },
   { id: 'senseaudio', title: 'SenseAudio' },
   { id: 'aihubmix', title: 'AIHubMix' },
-  { id: 'aimlapi', title: 'aimlapi.com' },
 ];
 
 export const API_PROTOCOL_LABELS: Record<ApiProtocol, string> = {
