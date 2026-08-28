@@ -1,5 +1,5 @@
 import type { ByokChatProviderConfig } from '@open-design/contracts';
-import { aimlapiAttributionHeaders } from '../integrations/aimlapi.js';
+import { aimlapiAttributionHeaders, isAimlapiApiHost } from '../integrations/aimlapi.js';
 
 export const BYOK_OPENCODE_AGENT_ID = 'byok-opencode';
 export const BYOK_OPENCODE_PROVIDER_ID = 'open-design-byok';
@@ -171,6 +171,20 @@ function isRealOpenAIHost(baseUrl: string): boolean {
   }
 }
 
+function aimlapiProviderEntry(
+  baseUrl: string,
+  apiKeyOption: Record<string, unknown>,
+): { npm: ProviderPackage; options: Record<string, unknown> } {
+  return {
+    npm: '@ai-sdk/openai-compatible',
+    options: {
+      baseURL: baseUrl,
+      ...apiKeyOption,
+      headers: aimlapiAttributionHeaders(),
+    },
+  };
+}
+
 function buildProviderEntry(
   protocol: ByokChatProviderConfig['protocol'],
   baseUrl: string,
@@ -220,6 +234,12 @@ function buildProviderEntry(
         },
       };
     case 'openai':
+      // Legacy configs saved under the generic "OpenAI" tab but pointed at
+      // aimlapi.com's real host still need the attribution pair — see
+      // isAimlapiApiHost() for why this can't be keyed on protocol alone.
+      if (isAimlapiApiHost(baseUrl)) {
+        return aimlapiProviderEntry(baseUrl, apiKeyOption);
+      }
       // Real OpenAI speaks the Responses API via @ai-sdk/openai. Every other
       // host under the "openai" protocol (DeepSeek, vLLM, etc.) only serves
       // /chat/completions, so route it through @ai-sdk/openai-compatible.
@@ -245,14 +265,7 @@ function buildProviderEntry(
       // ever covers Test connection and model discovery. The options object is
       // handed to the provider factory, which forwards `headers` on every
       // upstream request.
-      return {
-        npm: '@ai-sdk/openai-compatible',
-        options: {
-          baseURL: baseUrl,
-          ...apiKeyOption,
-          headers: aimlapiAttributionHeaders(),
-        },
-      };
+      return aimlapiProviderEntry(baseUrl, apiKeyOption);
     case 'senseaudio':
     case 'aihubmix':
       return {

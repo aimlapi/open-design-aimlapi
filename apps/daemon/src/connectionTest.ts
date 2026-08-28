@@ -60,7 +60,7 @@ import {
   isUnsupportedMaxTokensError,
 } from './integrations/openai-chat-token-params.js';
 import { aihubmixHeaders } from './integrations/aihubmix.js';
-import { aimlapiHeaders } from './integrations/aimlapi.js';
+import { aimlapiHeaders, isAimlapiApiHost } from './integrations/aimlapi.js';
 import type { AgentCliEnvPrefs } from './app-config.js';
 import type { RuntimeAgentDef } from './runtimes/types.js';
 import { preparePromptFileForAgent, type PreparedPromptFile } from './runtimes/prompt-file.js';
@@ -1393,6 +1393,23 @@ function openAIResponsesProviderCall(
   };
 }
 
+function aimlapiProviderCall(baseUrl: string, apiKey: string, model: string): ProviderCallShape {
+  return {
+    url: appendVersionedApiPath(baseUrl, '/chat/completions'),
+    headers: {
+      'content-type': 'application/json',
+      ...aimlapiHeaders(apiKey),
+    },
+    body: {
+      model,
+      ...buildOpenAIChatTokenParam(model, PROVIDER_MAX_TOKENS),
+      messages: [{ role: 'user', content: SMOKE_PROMPT }],
+      stream: false,
+    },
+    extractText: extractOpenAIMessageText,
+  };
+}
+
 function buildProviderCall(input: ProviderTestRequest): ProviderCallShape {
   const baseUrl = String(input.baseUrl);
   const apiKey = String(input.apiKey);
@@ -1432,20 +1449,7 @@ function buildProviderCall(input: ProviderTestRequest): ProviderCallShape {
       // aimlapi.com is wire-compatible with OpenAI but carries the attribution
       // pair on every request (see aimlapiHeaders) — the smoke test included,
       // so a key check is attributed like any other call.
-      return {
-        url: appendVersionedApiPath(baseUrl, '/chat/completions'),
-        headers: {
-          'content-type': 'application/json',
-          ...aimlapiHeaders(apiKey),
-        },
-        body: {
-          model,
-          ...buildOpenAIChatTokenParam(model, PROVIDER_MAX_TOKENS),
-          messages: [{ role: 'user', content: SMOKE_PROMPT }],
-          stream: false,
-        },
-        extractText: extractOpenAIMessageText,
-      };
+      return aimlapiProviderCall(baseUrl, apiKey, model);
     case 'aihubmix':
       // AIHubMix is wire-compatible with OpenAI but carries the fixed APP-Code
       // attribution header on every request (see aihubmixHeaders). Same body /
@@ -1472,6 +1476,12 @@ function buildProviderCall(input: ProviderTestRequest): ProviderCallShape {
       // upstream-side in chat-routes; this layer assumes the caller passed
       // a concrete URL via the BYOK form.
       if (input.protocol === 'openai') {
+        // Legacy configs saved under the generic "OpenAI" tab but pointed at
+        // aimlapi.com's real host still need the attribution pair — see
+        // isAimlapiApiHost() for why this can't be keyed on protocol alone.
+        if (isAimlapiApiHost(baseUrl)) {
+          return aimlapiProviderCall(baseUrl, apiKey, model);
+        }
         const runProviderPackage = resolveOpenAIConnectionTestRunProviderPackage(input);
         if (runProviderPackage === '@ai-sdk/openai') {
           return openAIResponsesProviderCall(baseUrl, apiKey, model);

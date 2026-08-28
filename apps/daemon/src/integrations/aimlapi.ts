@@ -81,3 +81,35 @@ export function aimlapiOriginFromBase(baseUrl: string | undefined | null): strin
     return new URL(AIMLAPI_DEFAULT_BASE_URL).origin;
   }
 }
+
+/**
+ * aimlapi.com's real production hostname — the one host this validated
+ * exact-match check will ever recognize (no wildcard/subdomain matching, so
+ * a lookalike or attacker-controlled domain can never pick up the
+ * attribution pair or the aimlapi-specific catalog/model behavior).
+ */
+const AIMLAPI_API_HOSTNAME = 'api.aimlapi.com';
+
+/**
+ * True when `baseUrl` resolves to aimlapi.com's real API host, regardless of
+ * which BYOK protocol tab the caller is configured under. aimlapi.com is
+ * OpenAI-wire-compatible, so it already worked (pre-dating this integration)
+ * through the generic "OpenAI" tab with a hand-typed base URL — those
+ * existing saved configs stay `protocol: 'openai'` (backward compatibility
+ * is explicit: "saved configs load unchanged"), so a dispatch keyed only on
+ * `protocol === 'aimlapi'` silently excludes them from the attribution pair,
+ * the curated catalog filter, and the aimlapi-specific request shape this
+ * whole integration exists to add. Callers should check this ALONGSIDE
+ * `protocol === 'aimlapi'`, not instead of it, so a native aimlapi.com
+ * config with no baseUrl override (falls back to AIMLAPI_DEFAULT_BASE_URL)
+ * still matches.
+ */
+export function isAimlapiApiHost(baseUrl: string | undefined | null): boolean {
+  const candidate = (baseUrl || '').trim();
+  if (!candidate) return false;
+  try {
+    return new URL(candidate).hostname.toLowerCase() === AIMLAPI_API_HOSTNAME;
+  } catch {
+    return false;
+  }
+}
