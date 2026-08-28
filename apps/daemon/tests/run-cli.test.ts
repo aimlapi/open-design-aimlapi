@@ -212,6 +212,59 @@ describe('od run CLI', () => {
     });
   });
 
+  // #7461 review finding: aimlapi (and any other BYOK-only protocol with no
+  // env-var credential the daemon can pick up on its own) was reachable
+  // from Settings but had no CLI-side way to construct the ChatRequest
+  // byokProvider, breaking the dual-track capability-exposure rule for that
+  // protocol. --byok-provider-file closes that gap.
+  it('forwards a --byok-provider-file snapshot as byokProvider on the run creation request', async () => {
+    stub = await startRunStubServer(true);
+    tempDir = await mkdtemp(join(tmpdir(), 'od-run-byok-'));
+    const byokFile = join(tempDir, 'byok.json');
+    await writeFile(
+      byokFile,
+      JSON.stringify({
+        protocol: 'aimlapi',
+        apiKey: 'test-aimlapi-key',
+        model: 'openai/gpt-5.6-terra',
+      }),
+      'utf8',
+    );
+
+    const result = await runCli([
+      'run', 'start', '--project', 'project-1',
+      '--byok-provider-file', byokFile,
+      '--daemon-url', stub.baseUrl,
+    ]);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(JSON.parse(stub.requests[0]!.body)).toMatchObject({
+      projectId: 'project-1',
+      byokProvider: {
+        protocol: 'aimlapi',
+        apiKey: 'test-aimlapi-key',
+        model: 'openai/gpt-5.6-terra',
+      },
+    });
+  });
+
+  it('rejects a --byok-provider-file that is not valid ByokChatProviderConfig JSON', async () => {
+    stub = await startRunStubServer(true);
+    tempDir = await mkdtemp(join(tmpdir(), 'od-run-byok-invalid-'));
+    const byokFile = join(tempDir, 'byok.json');
+    await writeFile(byokFile, JSON.stringify({ apiKey: 'missing-protocol' }), 'utf8');
+
+    const result = await runCli([
+      'run', 'start', '--project', 'project-1',
+      '--byok-provider-file', byokFile,
+      '--daemon-url', stub.baseUrl,
+    ]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('--byok-provider-file must be a JSON object');
+    expect(stub.requests).toHaveLength(0);
+  });
+
   it('continues a resumable run through the normal run creation API', async () => {
     stub = await startRunStubServer(true);
 
