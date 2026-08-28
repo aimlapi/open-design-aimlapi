@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { runDaemonCliStartup, startDaemonRuntime } from './daemon-startup.js';
+import { BYOK_OPENCODE_AGENT_ID } from './runtimes/byok-opencode.js';
 import { runLiveArtifactsMcpServer } from './mcp-live-artifacts-server.js';
 import { runArtifactsCli } from './artifacts-cli.js';
 import { runResource } from './resource-cli.js';
@@ -7973,7 +7974,29 @@ Common options:
       if (flags['task-execution']) body.taskExecutionId = flags['task-execution'];
       if (flags['client-request-id']) body.clientRequestId = flags['client-request-id'];
       const byokProvider = await readByokProviderFromFlags(flags);
-      if (byokProvider) body.byokProvider = byokProvider;
+      if (byokProvider) {
+        // The run route only honors byokProvider when agentId is literally
+        // 'byok-opencode' (hasCompleteByokOpenCodeConfig in routes/runs.ts
+        // treats every other agent as "already complete" and skips it
+        // entirely) — an omitted or different --agent would otherwise run
+        // Claude/Codex/etc. against the installation default and silently
+        // ignore the snapshot. Reject an explicit, incompatible --agent
+        // instead of guessing which one the caller actually wanted.
+        if (flags.agent && flags.agent !== BYOK_OPENCODE_AGENT_ID) {
+          console.error(
+            `--byok-provider-file requires --agent ${BYOK_OPENCODE_AGENT_ID} (or omit --agent); got --agent ${flags.agent}`,
+          );
+          process.exit(2);
+        }
+        body.agentId = BYOK_OPENCODE_AGENT_ID;
+        body.byokProvider = byokProvider;
+        // buildOpenCodeByokProviderConfig() (runtimes/byok-opencode.ts) reads
+        // the model from the top-level run field, not byokProvider.model —
+        // promote it there when the caller didn't already pass --model.
+        if (!flags.model && typeof byokProvider.model === 'string' && byokProvider.model.trim()) {
+          body.model = byokProvider.model.trim();
+        }
+      }
       const resp = await fetch(`${base}/api/runs`, {
         method:  'POST',
         headers: { 'content-type': 'application/json', ...workspaceHeaders },
