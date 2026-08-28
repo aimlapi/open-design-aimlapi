@@ -84,11 +84,11 @@ describe('memory-llm aimlapi.com BYOK snapshot', () => {
     );
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('https://api.aimlapi.com/v1/chat/completions');
+    expect(calls[0]?.url).toBe('https://api.aimlapi.com/v1/chat/completions');
     // An empty `model` must resolve to the aimlapi.com fast default, not to
     // another provider's (gpt-4o-mini would mean we fell through to OpenAI).
-    expect(JSON.parse(calls[0].body).model).toBe('google/gemini-3.6-flash');
-    expect(calls[0].headers.authorization).toBe('Bearer test-aimlapi-key');
+    expect(JSON.parse(calls[0]?.body ?? '{}').model).toBe('google/gemini-3.6-flash');
+    expect(calls[0]?.headers.authorization).toBe('Bearer test-aimlapi-key');
   });
 
   // aimlapi.com expects the attribution pair on EVERY request it serves, the
@@ -114,9 +114,9 @@ describe('memory-llm aimlapi.com BYOK snapshot', () => {
     );
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].headers['x-aimlapi-source']).toBe(AIMLAPI_SOURCE);
-    expect(calls[0].headers['x-aimlapi-partner-id']).toBe(AIMLAPI_PARTNER_ID);
+    expect(calls[0]?.headers['x-aimlapi-source']).toBe(AIMLAPI_SOURCE);
+    expect(calls[0]?.headers['x-aimlapi-partner-id']).toBe(AIMLAPI_PARTNER_ID);
     // An explicit model must win over the default.
-    expect(JSON.parse(calls[0].body).model).toBe('openai/gpt-5.6-terra');
+    expect(JSON.parse(calls[0]?.body ?? '{}').model).toBe('openai/gpt-5.6-terra');
   });
 });
