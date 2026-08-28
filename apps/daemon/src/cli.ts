@@ -250,6 +250,14 @@ const PROJECT_STRING_FLAGS = new Set([
   'agent', 'model', 'service-tier', 'snapshot-id', 'inputs', 'grant-caps', 'editor',
   'title', 'label', 'against', 'seed-from', 'fork-after', 'mode',
   'source',
+  // `od run start --byok-provider-file <path|->`: the headless-CLI half of
+  // the web BYOK provider snapshot (Settings) — same `<path|->` idiom as
+  // --prompt-file, JSON-parsed as ByokChatProviderConfig. Without this, a
+  // BYOK-only protocol (a native provider with no env-var credential the
+  // daemon can pick up on its own — currently aimlapi) is reachable from
+  // Settings but not from `od`, breaking the dual-track capability-exposure
+  // rule for that protocol.
+  'byok-provider-file',
 ]);
 const PROJECT_RESOURCE_STRING_FLAGS = new Set([
   ...PROJECT_STRING_FLAGS,
@@ -6944,6 +6952,50 @@ async function readRunMessageFromFlags(flags, fallback = null) {
   return fallback;
 }
 
+// `--byok-provider-file <path|->`: the headless-CLI counterpart to the web
+// BYOK Settings form, parsed as ByokChatProviderConfig and forwarded as
+// `byokProvider` on the /api/runs POST body (routes/runs.ts already reads
+// requestBody.byokProvider — this just closes the CLI-side gap for
+// protocols the daemon can't otherwise pick up credentials for, e.g.
+// aimlapi). Same `<path|->` stdin-or-file idiom as --prompt-file so a
+// secret never has to land on the command line / shell history.
+async function readByokProviderFromFlags(flags) {
+  const raw = flags['byok-provider-file'];
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+  let text;
+  if (raw === '-') {
+    text = await new Promise((resolve, reject) => {
+      let buf = '';
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', (chunk) => { buf += chunk; });
+      process.stdin.on('end', () => resolve(buf));
+      process.stdin.on('error', reject);
+    });
+  } else {
+    const { readFile } = await import('node:fs/promises');
+    text = await readFile(raw, 'utf8');
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    console.error(`--byok-provider-file must contain valid JSON: ${err.message}`);
+    process.exit(2);
+  }
+  if (
+    !parsed
+    || typeof parsed !== 'object'
+    || typeof parsed.protocol !== 'string'
+    || typeof parsed.apiKey !== 'string'
+  ) {
+    console.error(
+      '--byok-provider-file must be a JSON object with at least { "protocol": "...", "apiKey": "..." } (ByokChatProviderConfig)',
+    );
+    process.exit(2);
+  }
+  return parsed;
+}
+
 async function postJsonToDaemon(base, route, body, headers = {}) {
   let resp;
   try {
@@ -7659,6 +7711,9 @@ async function runRun(args) {
                [--client-request-id <id>]
                [--skill <id>[,<id>]] [--plugin <id>] [--inputs <json>] [--grant-caps a,b]
                [--agent claude|codex|opencode] [--model <id>] [--service-tier <id>]
+               [--byok-provider-file <path|->] (JSON ByokChatProviderConfig — BYOK-only
+                                                protocols, e.g. aimlapi, have no other
+                                                CLI-reachable credential path)
                [--workspace <id> --workspace-member <id>] [--follow] [--json]
   od run redesign [--path <folder>] [--message "<text>" | --prompt-file <path|->]
                [--agent claude] [--model <id>] [--service-tier <id>] [--follow] [--json]
@@ -7917,6 +7972,8 @@ Common options:
       if (flags['snapshot-id']) body.appliedPluginSnapshotId = flags['snapshot-id'];
       if (flags['task-execution']) body.taskExecutionId = flags['task-execution'];
       if (flags['client-request-id']) body.clientRequestId = flags['client-request-id'];
+      const byokProvider = await readByokProviderFromFlags(flags);
+      if (byokProvider) body.byokProvider = byokProvider;
       const resp = await fetch(`${base}/api/runs`, {
         method:  'POST',
         headers: { 'content-type': 'application/json', ...workspaceHeaders },
