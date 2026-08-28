@@ -217,7 +217,16 @@ describe('od run CLI', () => {
   // from Settings but had no CLI-side way to construct the ChatRequest
   // byokProvider, breaking the dual-track capability-exposure rule for that
   // protocol. --byok-provider-file closes that gap.
-  it('forwards a --byok-provider-file snapshot as byokProvider on the run creation request', async () => {
+  //
+  // Follow-up finding on the first pass: setting byokProvider alone is not
+  // enough. routes/runs.ts's hasCompleteByokOpenCodeConfig() only even
+  // looks at byokProvider when agentId === 'byok-opencode' — any other
+  // (or omitted) agent is treated as "already complete" and the run
+  // silently proceeds against the installation's default agent, ignoring
+  // the snapshot entirely. And buildOpenCodeByokProviderConfig() reads the
+  // model from the top-level run field, not byokProvider.model. So
+  // --byok-provider-file must also set agentId and promote the model.
+  it('forwards a --byok-provider-file snapshot with the byok-opencode agent and promoted model', async () => {
     stub = await startRunStubServer(true);
     tempDir = await mkdtemp(join(tmpdir(), 'od-run-byok-'));
     const byokFile = join(tempDir, 'byok.json');
@@ -240,12 +249,60 @@ describe('od run CLI', () => {
     expect(result.code, result.stderr).toBe(0);
     expect(JSON.parse(stub.requests[0]!.body)).toMatchObject({
       projectId: 'project-1',
+      agentId: 'byok-opencode',
+      model: 'openai/gpt-5.6-terra',
       byokProvider: {
         protocol: 'aimlapi',
         apiKey: 'test-aimlapi-key',
         model: 'openai/gpt-5.6-terra',
       },
     });
+  });
+
+  it('keeps an explicit --model over the byokProvider model when both are given', async () => {
+    stub = await startRunStubServer(true);
+    tempDir = await mkdtemp(join(tmpdir(), 'od-run-byok-model-'));
+    const byokFile = join(tempDir, 'byok.json');
+    await writeFile(
+      byokFile,
+      JSON.stringify({ protocol: 'aimlapi', apiKey: 'test-aimlapi-key', model: 'from-file' }),
+      'utf8',
+    );
+
+    const result = await runCli([
+      'run', 'start', '--project', 'project-1',
+      '--byok-provider-file', byokFile,
+      '--model', 'from-flag',
+      '--daemon-url', stub.baseUrl,
+    ]);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(JSON.parse(stub.requests[0]!.body)).toMatchObject({
+      agentId: 'byok-opencode',
+      model: 'from-flag',
+    });
+  });
+
+  it('rejects --byok-provider-file combined with an incompatible --agent instead of silently ignoring one', async () => {
+    stub = await startRunStubServer(true);
+    tempDir = await mkdtemp(join(tmpdir(), 'od-run-byok-agent-conflict-'));
+    const byokFile = join(tempDir, 'byok.json');
+    await writeFile(
+      byokFile,
+      JSON.stringify({ protocol: 'aimlapi', apiKey: 'test-aimlapi-key', model: 'openai/gpt-5.6-terra' }),
+      'utf8',
+    );
+
+    const result = await runCli([
+      'run', 'start', '--project', 'project-1',
+      '--byok-provider-file', byokFile,
+      '--agent', 'claude',
+      '--daemon-url', stub.baseUrl,
+    ]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('--byok-provider-file requires --agent byok-opencode');
+    expect(stub.requests).toHaveLength(0);
   });
 
   it('rejects a --byok-provider-file that is not valid ByokChatProviderConfig JSON', async () => {
