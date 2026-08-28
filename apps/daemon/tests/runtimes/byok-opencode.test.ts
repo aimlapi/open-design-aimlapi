@@ -289,6 +289,49 @@ describe('byok-opencode runtime config', () => {
     );
   });
 
+  // Saved configs pre-dating the 'aimlapi' protocol stay 'openai' with a
+  // hand-typed base URL (explicit backward-compat promise: "saved configs
+  // load unchanged"), so this runtime — the one that serves real chat, not
+  // just Test connection / model discovery — has to recognize the host too
+  // (#7461 review finding).
+  it("sends the aimlapi.com attribution pair for a legacy 'openai' protocol config pointed at api.aimlapi.com", () => {
+    const out = buildOpenCodeByokProviderConfig(
+      {
+        protocol: 'openai',
+        apiKey: 'sk-legacy-aimlapi-secret',
+        baseUrl: 'https://api.aimlapi.com/v1',
+      },
+      'openai/gpt-5.6-terra',
+    );
+
+    expect(out?.config).toMatchObject({
+      provider: {
+        [BYOK_OPENCODE_PROVIDER_ID]: {
+          npm: '@ai-sdk/openai-compatible',
+          options: {
+            baseURL: 'https://api.aimlapi.com/v1',
+            apiKey: `{env:${BYOK_OPENCODE_API_KEY_ENV}}`,
+          },
+        },
+      },
+    });
+    const options = (out?.config as any).provider[BYOK_OPENCODE_PROVIDER_ID].options;
+    expect(options.headers['X-AIMLAPI-Source']).toBe('agent/open-design');
+    expect(options.headers['X-AIMLAPI-Partner-ID']).toBe(
+      'part_9TWZWFsyMyNrBDEENq5JaU0r',
+    );
+  });
+
+  it("does not leak the aimlapi.com attribution pair to an ordinary OpenAI-compatible host under the 'openai' protocol", () => {
+    const out = buildOpenCodeByokProviderConfig(
+      { protocol: 'openai', apiKey: 'sk-deepseek', baseUrl: 'https://api.deepseek.com' },
+      'deepseek-v4-pro',
+    );
+
+    const options = (out?.config as any).provider[BYOK_OPENCODE_PROVIDER_ID].options;
+    expect(options.headers).toBeUndefined();
+  });
+
   it('maps other native BYOK protocols to provider packages', () => {
     expect(buildOpenCodeByokProviderConfig(
       { protocol: 'anthropic', apiKey: 'sk-ant', baseUrl: 'https://api.anthropic.com' },

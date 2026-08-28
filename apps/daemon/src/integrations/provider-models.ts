@@ -12,7 +12,7 @@ import { isLoopbackApiHost } from '@open-design/contracts/api/connectionTest';
 import { redactSecrets, validateUserProviderBaseUrl } from '../connectionTest.js';
 import { googleProviderModelsUrl, normalizeGoogleModelId } from './google-models.js';
 import { aihubmixHeaders, aihubmixCatalogUrl, parseAIHubMixCatalog } from './aihubmix.js';
-import { aimlapiHeaders } from './aimlapi.js';
+import { aimlapiHeaders, isAimlapiApiHost } from './aimlapi.js';
 
 type ProviderModelsInput = ProviderModelsRequest & {
   signal?: AbortSignal;
@@ -300,7 +300,18 @@ function providerModelsUrl(protocol: ConnectionTestProtocol, baseUrl: string, ap
 function providerModelsHeaders(
   protocol: ConnectionTestProtocol,
   apiKey: string,
+  baseUrl: string,
 ): Record<string, string> {
+  // aimlapi.com is OpenAI-wire-compatible, so it already worked through the
+  // generic "OpenAI" tab before this integration existed — those saved
+  // configs stay protocol: 'openai' (explicit backward-compat promise: saved
+  // configs load unchanged), so a dispatch keyed only on protocol ===
+  // 'aimlapi' would silently exclude them from the attribution pair this
+  // integration exists to add. Checked before the generic openai/senseaudio
+  // branch so it takes priority for exactly this host.
+  if (protocol === 'openai' && isAimlapiApiHost(baseUrl)) {
+    return aimlapiHeaders(apiKey);
+  }
   if (protocol === 'openai' || protocol === 'senseaudio') {
     return { authorization: `Bearer ${apiKey}` };
   }
@@ -325,7 +336,11 @@ function providerModelsHeaders(
   return {};
 }
 
-function extractModels(protocol: ConnectionTestProtocol, data: unknown): ProviderModelOption[] {
+function extractModels(
+  protocol: ConnectionTestProtocol,
+  data: unknown,
+  baseUrl: string,
+): ProviderModelOption[] {
   // SenseAudio's /v1/models response follows the OpenAI envelope
   // (`{ data: [{ id, ... }] }`), so the same extractor handles both.
   // Chat picker: drop media-generation rows. AIHubMix's `?type=llm` matches any
@@ -335,8 +350,12 @@ function extractModels(protocol: ConnectionTestProtocol, data: unknown): Provide
   if (protocol === 'aihubmix') return parseAIHubMixCatalog(data, { chatOnly: true });
   // AI/ML API's mixed catalog needs its own type-aware extractor — see
   // extractAimlapiModels for why the shared id-substring heuristic isn't
-  // enough (or safe) here.
-  if (protocol === 'aimlapi') return extractAimlapiModels(data);
+  // enough (or safe) here. Also applies to a legacy generic-OpenAI-tab
+  // config pointed at aimlapi.com — same host, same mixed catalog, same
+  // leak/false-positive risk (see providerModelsHeaders above).
+  if (protocol === 'aimlapi' || (protocol === 'openai' && isAimlapiApiHost(baseUrl))) {
+    return extractAimlapiModels(data);
+  }
   if (protocol === 'openai' || protocol === 'senseaudio') {
     return extractOpenAiModels(data);
   }
@@ -401,7 +420,7 @@ export async function listProviderModels(
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: providerModelsHeaders(input.protocol, input.apiKey),
+      headers: providerModelsHeaders(input.protocol, input.apiKey, input.baseUrl),
       ...input.requestInit,
       signal: controller.signal,
       redirect: 'error',
@@ -439,7 +458,7 @@ export async function listProviderModels(
       };
     }
 
-    const models = extractModels(input.protocol, data);
+    const models = extractModels(input.protocol, data, input.baseUrl);
     console.log(
       `[provider:models] ${input.protocol} ${validated.parsed.hostname} → ${models.length} models in ${latencyMs}ms`,
     );
