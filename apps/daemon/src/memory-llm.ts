@@ -67,6 +67,7 @@ import { AIHUBMIX_APP_CODE } from './integrations/aihubmix.js';
 import {
   AIMLAPI_DEFAULT_BASE_URL,
   aimlapiAttributionHeaders,
+  isAimlapiApiHost,
 } from './integrations/aimlapi.js';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
@@ -853,7 +854,12 @@ async function callOpenAI(provider, system, user) {
           // aimlapi.com routes through this same OpenAI-compatible path and
           // expects the attribution pair on EVERY request it serves, the
           // extractor's included — a missing pair serves fine but untagged.
-          ...(provider.kind === 'aimlapi' ? aimlapiAttributionHeaders() : {}),
+          // Also covers pre-integration configs that stayed kind: 'openai'
+          // with a hand-typed api.aimlapi.com base URL (backward-compat
+          // promise: saved configs load unchanged) — see isAimlapiApiHost().
+          ...(provider.kind === 'aimlapi' || isAimlapiApiHost(provider.baseUrl)
+            ? aimlapiAttributionHeaders()
+            : {}),
         },
         body: JSON.stringify({
           model: provider.model,

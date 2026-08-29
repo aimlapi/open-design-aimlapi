@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { MEMORY_EXTRACTION_PROVIDERS, MEMORY_TYPES } from '@open-design/contracts';
-import type { ExtractMemoryRequest } from '@open-design/contracts';
+import type { ExtractMemoryRequest, MemoryExtractionProvider } from '@open-design/contracts';
 import type { RouteDeps } from '../server-context.js';
 
 import {
@@ -46,8 +46,6 @@ type MemoryType =
   | 'reference'
   | 'profile'
   | 'rule';
-type MemoryExtractionProvider = 'anthropic' | 'openai' | 'azure' | 'google' | 'ollama';
-
 interface MemoryExtractionPatch {
   provider: MemoryExtractionProvider;
   model?: string;
@@ -126,20 +124,14 @@ function isMemoryType(value: unknown): value is MemoryType {
 }
 
 function isExtractionProvider(value: unknown): value is MemoryExtractionProvider {
-  // Must stay exhaustive over MemoryExtractionProvider: a protocol the type
-  // admits but this guard omits is rejected here as an 'invalid extraction
-  // provider', so the user cannot save an override for a vendor the extractor
-  // itself supports. `senseaudio`, `aihubmix` and `aimlapi` all reach the
-  // extractor through the OpenAI-compatible path in memory-llm.ts.
+  // Sourced from the shared contract (MEMORY_EXTRACTION_PROVIDERS) so this
+  // guard can't drift narrower than MemoryExtractionProvider itself — a
+  // protocol the type admits but this guard omits would be rejected here as
+  // an 'invalid extraction provider', so the user could not save an override
+  // for a vendor the extractor actually supports.
   return (
-    value === 'anthropic'
-    || value === 'openai'
-    || value === 'azure'
-    || value === 'google'
-    || value === 'ollama'
-    || value === 'senseaudio'
-    || value === 'aihubmix'
-    || value === 'aimlapi'
+    typeof value === 'string'
+    && (MEMORY_EXTRACTION_PROVIDERS as readonly string[]).includes(value)
   );
 }
 
