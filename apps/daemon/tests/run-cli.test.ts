@@ -322,6 +322,28 @@ describe('od run CLI', () => {
     expect(stub.requests).toHaveLength(0);
   });
 
+  // #7461 review finding: --prompt-file - and --byok-provider-file - each
+  // read process.stdin to EOF via their own 'data'/'end' listeners. Node
+  // only ever emits 'end' once, so whichever reader runs second (byok, since
+  // readRunMessageFromFlags runs first) attaches after stdin has already
+  // ended and its promise never settles — the process hangs instead of
+  // making the request or reporting a usable error. Must be rejected up
+  // front, before either flag touches stdin.
+  it('rejects --prompt-file - combined with --byok-provider-file - instead of hanging on shared stdin', async () => {
+    stub = await startRunStubServer(true);
+
+    const result = await runCli([
+      'run', 'start', '--project', 'project-1',
+      '--prompt-file', '-',
+      '--byok-provider-file', '-',
+      '--daemon-url', stub.baseUrl,
+    ]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('--prompt-file - and --byok-provider-file -');
+    expect(stub.requests).toHaveLength(0);
+  });
+
   it('continues a resumable run through the normal run creation API', async () => {
     stub = await startRunStubServer(true);
 

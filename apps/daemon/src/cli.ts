@@ -7944,6 +7944,18 @@ Common options:
         console.error('--project <projectId> is required');
         process.exit(2);
       }
+      // --prompt-file - and --byok-provider-file - both read process.stdin to
+      // EOF via their own 'data'/'end' listeners. Node only emits 'end' once;
+      // whichever reader runs second attaches after stdin has already ended
+      // and its promise never settles — the process hangs instead of making
+      // the request. Reject the combination up front instead of guessing
+      // which one the caller meant to come from a real file.
+      if (flags['prompt-file'] === '-' && flags['byok-provider-file'] === '-') {
+        console.error(
+          '--prompt-file - and --byok-provider-file - cannot both read from stdin; point one of them at a real file path instead.',
+        );
+        process.exit(2);
+      }
       const body = { projectId: flags.project };
       if (flags.conversation) body.conversationId = flags.conversation;
       const message = await readRunMessageFromFlags(flags);
