@@ -119,4 +119,59 @@ describe('memory-llm aimlapi.com BYOK snapshot', () => {
     // An explicit model must win over the default.
     expect(JSON.parse(calls[0]?.body ?? '{}').model).toBe('openai/gpt-5.6-terra');
   });
+
+  // Saved configs pre-dating the 'aimlapi' protocol stay provider: 'openai'
+  // with a hand-typed base URL (backward-compat promise: saved configs load
+  // unchanged). ProjectView forwards that protocol verbatim as chatProvider,
+  // and pickProvider()'s "same as chat" branch copies it straight into
+  // `kind`, so this is the one request shape that skipped attribution
+  // before isAimlapiApiHost() was checked here too (#7461 review finding).
+  it("carries the attribution pair for a legacy 'openai' provider pointed at api.aimlapi.com", async () => {
+    const { calls } = captureOneCall();
+
+    await extractWithLLM(
+      dataDir,
+      { userMessage: 'I prefer dark mode.', assistantMessage: 'Noted.' },
+      {
+        projectRoot: null,
+        chatAgentId: null,
+        chatProvider: {
+          provider: 'openai',
+          apiKey: 'test-legacy-aimlapi-key',
+          baseUrl: 'https://api.aimlapi.com/v1',
+          apiVersion: '',
+          model: 'openai/gpt-5.6-terra',
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://api.aimlapi.com/v1/chat/completions');
+    expect(calls[0]?.headers['x-aimlapi-source']).toBe(AIMLAPI_SOURCE);
+    expect(calls[0]?.headers['x-aimlapi-partner-id']).toBe(AIMLAPI_PARTNER_ID);
+  });
+
+  it("does not send the aimlapi attribution pair for an ordinary 'openai' provider on an unrelated host", async () => {
+    const { calls } = captureOneCall();
+
+    await extractWithLLM(
+      dataDir,
+      { userMessage: 'I prefer dark mode.', assistantMessage: 'Noted.' },
+      {
+        projectRoot: null,
+        chatAgentId: null,
+        chatProvider: {
+          provider: 'openai',
+          apiKey: 'sk-unrelated',
+          baseUrl: 'https://api.openai.com/v1',
+          apiVersion: '',
+          model: 'gpt-4o-mini',
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers['x-aimlapi-source']).toBeUndefined();
+    expect(calls[0]?.headers['x-aimlapi-partner-id']).toBeUndefined();
+  });
 });
